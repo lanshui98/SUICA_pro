@@ -1,0 +1,32 @@
+case: auto_detection_example
+
+dataset:
+  type: auto  # Intelligent detection will determine GraphST2D, ST2D, GraphST3D, or ST3D
+  data_file: data/preprocessed_data/slice380_down2.h5ad
+  val_proportion: 0.2
+  keep_ratio: True
+  n_neighbors: 5  # This will be used if GraphST2D/GraphST3D is detected
+  require_coordnorm: true
+
+pipeline:
+  embedder:
+    model: GAE
+    dim_hidden: [2048, 512, 64]
+    dim_latent: 32
+
+  optimization:
+    seed: 8848
+    epochs: 200
+    lr: 1e-5
+    val_freq: 50
+    logs: logs/AutoDetection/${case}
+    batch_size: 512
+  
+  predict_mode: all
+  embedded_data: embedded-all.h5ad
+
+# Note: The system will automatically detect:
+# - 2D coordinates + graph features → GraphST2D
+# - 2D coordinates + no graph features → ST2D  
+# - 3D coordinates + graph features → GraphST3D
+# - 3D coordinates + no graph features → ST3D
