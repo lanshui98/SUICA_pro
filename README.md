@@ -9,7 +9,7 @@ This repository extends the SUICA framework proposed by Qingtian Zhu et al., ada
 ## Environment
 
 ```shell
-conda create -n SUICA python=3.9 -y && conda activate SUICA
+conda create -n SUICA_pro python=3.9 -y && conda activate SUICA_pro
 pip install -r requirements.txt
 ```
 
