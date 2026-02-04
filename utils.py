@@ -24,59 +24,59 @@ def construct_subgraph(data, adj,neighbors,idx):
 
 def anisotropic_kneighbors_graph(coordinates, n_neighbors, z_weight=2.0, z_threshold=None, mode='connectivity', n_jobs=8, include_self=True):
     """
-    各向异性 KNN 图构建 - 针对 z 方向稀疏的 3D 数据
-    
+    Anisotropic KNN graph construction - for 3D data with sparse z-direction.
+
     Args:
-        coordinates: 空间坐标 [N, 3] (x, y, z)
-        n_neighbors: 邻居数量
-        z_weight: z 方向的权重（>1 表示降低z方向距离的影响）
-        z_threshold: z 方向的最大距离阈值（None 表示不使用阈值）
-        mode: 'connectivity' 或 'distance'
-        n_jobs: 并行数
-        include_self: 是否包含自身
-    
+        coordinates: spatial coordinates [N, 3] (x, y, z)
+        n_neighbors: number of neighbors
+        z_weight: z-direction weight (>1 reduces z-distance influence)
+        z_threshold: max z-distance threshold (None to disable)
+        mode: 'connectivity' or 'distance'
+        n_jobs: number of parallel jobs
+        include_self: whether to include self
+
     Returns:
-        scipy.sparse.csr_matrix: 邻接矩阵
+        scipy.sparse.csr_matrix: adjacency matrix
     """
     from sklearn.neighbors import kneighbors_graph
     from scipy.sparse import csr_matrix
     import numpy as np
     
-    # 如果 z_threshold 未指定，根据数据自动设置
+    # If z_threshold not specified, set from data
     if z_threshold is None:
         z_range = coordinates[:, 2].max() - coordinates[:, 2].min()
-        # 自动设置阈值（例如：z范围的一半）
+        # Auto-set threshold (e.g. 30% of z range)
         z_threshold = z_range * 0.3
     
-    # 创建加权坐标（降低z方向的权重）
+    # Create weighted coordinates (reduce z-direction weight)
     weighted_coords = coordinates.copy()
     weighted_coords[:, 2] = weighted_coords[:, 2] / z_weight
     
-    # 构建 KNN 图
+    # Build KNN graph
     adj = kneighbors_graph(weighted_coords, n_neighbors, mode=mode, n_jobs=n_jobs, include_self=include_self)
     
-    # 如果指定了 z_threshold，移除超过阈值的连接
+    # If z_threshold specified, remove connections exceeding it
     if z_threshold is not None:
         from scipy.sparse import find
         
-        # 获取所有非零元素的位置
+        # Get positions of all non-zero elements
         rows, cols, data = find(adj)
         
-        # 计算实际的 z 方向距离
+        # Compute actual z-direction distances
         z_distances = np.abs(coordinates[rows, 2] - coordinates[cols, 2])
         
-        # 移除超过阈值的连接
+        # Remove connections exceeding threshold
         valid_mask = z_distances <= z_threshold
         
-        # 重新构建邻接矩阵
+        # Rebuild adjacency matrix
         valid_rows = rows[valid_mask]
         valid_cols = cols[valid_mask]
         valid_data = data[valid_mask] if mode == 'distance' else np.ones(valid_mask.sum())
         
-        # 创建一个新的稀疏矩阵
+        # Create new sparse matrix
         adj = csr_matrix((valid_data, (valid_rows, valid_cols)), shape=adj.shape)
         
-        # 确保对称性（如果是 connectivity 模式）
+        # Ensure symmetry (for connectivity mode)
         if mode == 'connectivity':
             adj = (adj + adj.T > 0).astype(float)
     
@@ -166,7 +166,7 @@ def _spearman_r(y_true, y_pred, mask=False):
             if len(y_t) >= 2 and len(y_p) >= 2:
                 corrs.append(np.nan_to_num(spearmanr(y_t, y_p).statistic))
             else:
-                corrs.append(0.0)  # 数据点不足，设为0
+                corrs.append(0.0)  # Insufficient data points, set to 0
         corrs = np.array(corrs)
     else:
         corrs = []
@@ -174,7 +174,7 @@ def _spearman_r(y_true, y_pred, mask=False):
             if len(y_true[i]) >= 2 and len(y_pred[i]) >= 2:
                 corrs.append(np.nan_to_num(spearmanr(y_true[i], y_pred[i]).statistic))
             else:
-                corrs.append(0.0)  # 数据点不足，设为0
+                corrs.append(0.0)  # Insufficient data points, set to 0
         corrs = np.array(corrs)
     return corrs.mean()
 
@@ -187,7 +187,7 @@ def _pearson_r(y_true, y_pred, mask=False):
             if len(y_t) >= 2 and len(y_p) >= 2:
                 corrs.append(np.nan_to_num(pearsonr(y_t, y_p).statistic))
             else:
-                corrs.append(0.0)  # 数据点不足，设为0
+                corrs.append(0.0)  # Insufficient data points, set to 0
         corrs = np.array(corrs)
     else:
         corrs = []
@@ -195,7 +195,7 @@ def _pearson_r(y_true, y_pred, mask=False):
             if len(y_true[i]) >= 2 and len(y_pred[i]) >= 2:
                 corrs.append(np.nan_to_num(pearsonr(y_true[i], y_pred[i]).statistic))
             else:
-                corrs.append(0.0)  # 数据点不足，设为0
+                corrs.append(0.0)  # Insufficient data points, set to 0
         corrs = np.array(corrs)
     return corrs.mean()
 

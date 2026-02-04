@@ -34,7 +34,7 @@ class ST2D(Dataset):
         if require_coordnorm:
             self._normalize_coordinates(keep_ratio=keep_ratio)
 
-        # PCA: 当特征数 < 3 时，n_components 不能超过特征数
+        # PCA: when n_features < 3, n_components cannot exceed n_features
         n_components_raw = min(3, self.n_gene)
         self.raw_pca = PCA(n_components=n_components_raw, random_state=0) # map raw representation dimension to 3 for visualization
         self.raw_pca.fit(self.raw_representations)
@@ -49,7 +49,7 @@ class ST2D(Dataset):
         return False if self.embeddings is None else True
 
     def plot_raw_representations(self, spot_size=2, train_indices=None, val_indices=None):
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -73,7 +73,7 @@ class ST2D(Dataset):
     
     def plot_embeddings(self, spot_size=2, train_indices=None, val_indices=None):
         assert self.has_embeddings(), "The current adata file has NO embeddings!"
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -186,7 +186,7 @@ class ST3D(Dataset):
         if require_coordnorm:
             self._normalize_coordinates(keep_ratio=keep_ratio)
 
-        # PCA: 当特征数 < 3 时，n_components 不能超过特征数
+        # PCA: when n_features < 3, n_components cannot exceed n_features
         n_components_raw = min(3, self.n_gene)
         self.raw_pca = PCA(n_components=n_components_raw, random_state=0) # map raw representation dimension to 3 for visualization
         self.raw_pca.fit(self.raw_representations)
@@ -201,7 +201,7 @@ class ST3D(Dataset):
         return False if self.embeddings is None else True
 
     def plot_raw_representations(self, spot_size=2, train_indices=None, val_indices=None):
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -225,7 +225,7 @@ class ST3D(Dataset):
     
     def plot_embeddings(self, spot_size=2, train_indices=None, val_indices=None):
         assert self.has_embeddings(), "The current adata file has NO embeddings!"
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -330,7 +330,7 @@ class HRSS(Dataset):
 
             
 
-        # PCA: 当特征数 < 3 时，n_components 不能超过特征数
+        # PCA: when n_features < 3, n_components cannot exceed n_features
         n_components_raw = min(3, self.raw.shape[1])
         self.raw_pca = PCA(n_components=n_components_raw, random_state=0)
         self.raw_pca.fit(self.raw)
@@ -356,7 +356,7 @@ class HRSS(Dataset):
         self.raw = normalized_image
     
     def plot_raw_representations(self, train_indices=None, val_indices=None):
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -444,7 +444,7 @@ class GraphST2D(Dataset):
 
         self._normalize_coordinates(keep_ratio=keep_ratio)
 
-        # PCA: 当特征数 < 3 时，n_components 不能超过特征数
+        # PCA: when n_features < 3, n_components cannot exceed n_features
         n_components_raw = min(3, self.n_gene)
         self.raw_pca = PCA(n_components=n_components_raw, random_state=0) # map raw representation dimension to 3 for visualization
         self.raw_pca.fit(self.raw_representations)
@@ -459,7 +459,7 @@ class GraphST2D(Dataset):
         return False if self.embeddings is None else True
 
     def plot_raw_representations(self, spot_size=2, train_indices=None, val_indices=None):
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -483,7 +483,7 @@ class GraphST2D(Dataset):
     
     def plot_embeddings(self, spot_size=2, train_indices=None, val_indices=None):
         assert self.has_embeddings(), "The current adata file has NO embeddings!"
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
@@ -577,7 +577,7 @@ class GraphST3D(Dataset):
 
         self._normalize_coordinates(keep_ratio=keep_ratio, preserve_z_scale=preserve_z_scale, z_scale_factor=z_scale_factor)
 
-        # PCA: 当特征数 < 3 时，n_components 不能超过特征数
+        # PCA: when n_features < 3, n_components cannot exceed n_features
         n_components_raw = min(3, self.n_gene)
         self.raw_pca = PCA(n_components=n_components_raw, random_state=0)
         self.raw_pca.fit(self.raw_representations)
@@ -592,12 +592,12 @@ class GraphST3D(Dataset):
 
     def _normalize_coordinates(self, keep_ratio, preserve_z_scale=False, z_scale_factor=1.0):
         """
-        归一化坐标
-        
+        Normalize coordinates to [-1, 1].
+
         Args:
-            keep_ratio: 是否保持长宽比
-            preserve_z_scale: 是否保留z方向的原始尺度（用于稀疏z方向）
-            z_scale_factor: z方向的缩放因子（>1 表示放大z方向的重要性）
+            keep_ratio: whether to preserve aspect ratio
+            preserve_z_scale: whether to preserve original z-scale (for sparse z-direction)
+            z_scale_factor: z-direction scale factor (>1 amplifies z importance)
         """
         x_min, y_min, z_min = self.coordinates.min(axis=0)
         x_max, y_max, z_max = self.coordinates.max(axis=0)
@@ -613,12 +613,12 @@ class GraphST3D(Dataset):
 
         if keep_ratio:
             if preserve_z_scale:
-                # 不压缩z方向，让z保持较大的范围
+                # Do not compress z-direction, keep z at larger range
                 max_xy_range = max(x_range, y_range)
                 scale_x = x_range / max_xy_range
                 scale_y = y_range / max_xy_range
-                # z方向使用原始范围，并可以进一步放大
-                scale_z = z_scale_factor  # 不缩小z方向，或放大它
+                # z-direction uses original range, can be further amplified
+                scale_z = z_scale_factor  # Do not shrink z-direction, or amplify it
             else:
                 max_range = max(x_range, y_range, z_range)
                 scale_x = x_range / max_range
@@ -651,15 +651,15 @@ class GraphST3D(Dataset):
 
     def plot_raw_representations(self, spot_size=2, train_indices=None, val_indices=None):
         coords = self.coordinates
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
             elif rep.shape[1] == 2:
-                # 填充第三维为 0
+                # Pad third dim with 0
                 return np.concatenate([rep, np.zeros((rep.shape[0], 1))], axis=1)
             elif rep.shape[1] == 1:
-                # 复制到 3 维
+                # Replicate to 3 dims
                 return np.repeat(rep, 3, axis=1)
             else:
                 return rep
@@ -677,15 +677,15 @@ class GraphST3D(Dataset):
     def plot_embeddings(self, spot_size=2, train_indices=None, val_indices=None):
         assert self.has_embeddings(), "No embeddings available!"
         coords = self.coordinates
-        # PCA 输出可能 < 3 维，需要填充到 3 维用于可视化
+        # PCA output may be < 3 dims, pad to 3 for visualization
         def _pad_to_3d(rep):
             if rep.shape[1] == 3:
                 return rep
             elif rep.shape[1] == 2:
-                # 填充第三维为 0
+                # Pad third dim with 0
                 return np.concatenate([rep, np.zeros((rep.shape[0], 1))], axis=1)
             elif rep.shape[1] == 1:
-                # 复制到 3 维
+                # Replicate to 3 dims
                 return np.repeat(rep, 3, axis=1)
             else:
                 return rep
@@ -703,7 +703,7 @@ class GraphST3D(Dataset):
 
 if __name__ == "__main__":
 
-    ds = ST3D("./data/preprocessed_data/E9_two_slices.h5ad", True, True)
+    ds = ST3D("./data/3D_data.h5ad", True, True)
     raw = ds.raw_representations
     print(raw.max(), raw.min())
     sparsity = (raw==0).sum() / (raw>=0).sum()

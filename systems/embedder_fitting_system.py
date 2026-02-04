@@ -272,12 +272,12 @@ def train_embedder(configs):
         n_neighbors = configs.dataset.n_neighbors
         adata =  sc.read_h5ad(dataset_configs.data_file)
         
-        # 对于3D数据，支持各向异性图构建（稀疏z方向）
+        # For 3D data, support anisotropic graph construction (sparse z-direction)
         if dataset_configs.type == 'GraphST3D':
-            # 获取各向异性参数（可选）
-            z_weight = getattr(dataset_configs, 'z_weight', 2.0)  # z方向权重
-            z_threshold = getattr(dataset_configs, 'z_threshold', None)  # z方向阈值
-            use_anisotropic = getattr(dataset_configs, 'use_anisotropic_knn', True)  # 是否使用各向异性
+            # Get anisotropic params (optional)
+            z_weight = getattr(dataset_configs, 'z_weight', 2.0)  # z-direction weight
+            z_threshold = getattr(dataset_configs, 'z_threshold', None)  # z-direction threshold
+            use_anisotropic = getattr(dataset_configs, 'use_anisotropic_knn', True)  # whether to use anisotropic
             
             if use_anisotropic:
                 print(f"[yellow]Using anisotropic KNN for 3D data: z_weight={z_weight}, z_threshold={z_threshold}[/yellow]")
@@ -297,7 +297,7 @@ def train_embedder(configs):
         
         adj = adj.astype(np.float32)
         
-        # 获取3D特定的归一化参数
+        # Get 3D-specific normalization params
         preserve_z_scale = getattr(dataset_configs, 'preserve_z_scale', False)
         z_scale_factor = getattr(dataset_configs, 'z_scale_factor', 1.0)
         
@@ -320,7 +320,7 @@ def train_embedder(configs):
         adata_val = adata[val_idx]
         print(len(adata_train),len(adata_val))
         print(f"{val_idx[:10]=}") # check whether seed works
-        # 对于3D数据，训练集和验证集也使用各向异性图构建
+        # For 3D data, train and val sets also use anisotropic graph construction
         if dataset_configs.type == 'GraphST3D' and getattr(dataset_configs, 'use_anisotropic_knn', True):
             z_weight = getattr(dataset_configs, 'z_weight', 2.0)
             z_threshold = getattr(dataset_configs, 'z_threshold', None)

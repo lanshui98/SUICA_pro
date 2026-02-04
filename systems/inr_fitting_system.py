@@ -36,12 +36,12 @@ class INRFittingSystem(L.LightningModule):
                     final_activation=final_act
                 )
         elif network_configs.model == "FFN":
-            # 支持新的编码选项（可选参数，向后兼容）
+            # Support new encoding options (optional, backward compatible)
             encoding_type = getattr(network_configs, 'encoding_type', 'basic')
             mapping_size = getattr(network_configs, 'mapping_size', 256)
             encoding_scales = getattr(network_configs, 'encoding_scales', [1, 10, 100])
-            anisotropic_3d = getattr(network_configs, 'anisotropic_3d', False)  # 3D各向异性编码
-            z_scales = getattr(network_configs, 'z_scales', None)  # z方向频率
+            anisotropic_3d = getattr(network_configs, 'anisotropic_3d', False)  # 3D anisotropic encoding
+            z_scales = getattr(network_configs, 'z_scales', None)  # z-direction frequencies
             
             self.fitting_model = FourierFeatureNet(
                 dim_in=network_configs.dim_in,
@@ -54,7 +54,7 @@ class INRFittingSystem(L.LightningModule):
                 encoding_scales=encoding_scales,
                 anisotropic_3d=anisotropic_3d,
                 z_scales=z_scales,
-                network_configs=network_configs  # 传递完整的config以便访问参数
+                network_configs=network_configs  # Pass full config for parameter access
             )
         elif network_configs.model == "NGP":
             self.fitting_model = NGP(
@@ -319,19 +319,19 @@ def train_inr(configs):
         del dataset
         gc.collect()
 
-        # 1. 获取自定义坐标
+        # 1. Get custom coordinates
         if hasattr(pipeline_configs, 'custom_coords_file'):
-            # 从.npy文件加载坐标
+            # Load coords from .npy file
             custom_coords = np.load(pipeline_configs.custom_coords_file)
-            print(f"从文件加载自定义坐标: {pipeline_configs.custom_coords_file}")
-            print(f"坐标形状: {custom_coords.shape}")
+            print(f"Loaded custom coords from file: {pipeline_configs.custom_coords_file}")
+            print(f"Coord shape: {custom_coords.shape}")
         elif hasattr(pipeline_configs, 'custom_coordinates'):
-            # 从配置直接获取坐标
+            # Get coords directly from config
             custom_coords = np.array(pipeline_configs.custom_coordinates)
-            print(f"从配置加载自定义坐标，形状: {custom_coords.shape}")
+            print(f"Loaded custom coords from config, shape: {custom_coords.shape}")
         else:
-            # 默认示例坐标
-            print("[yellow]未指定自定义坐标，使用默认示例[/yellow]")
+            # Default example coordinates
+            print("[yellow]No custom coords specified, using default example[/yellow]")
             custom_coords = np.array([
                 [10.0, 20.0, 0.0],
                 [30.0, 40.0, 0.0], 
@@ -339,50 +339,50 @@ def train_inr(configs):
                 [70.0, 80.0, 1.5]
             ])
         
-        # 2. 构建自定义数据集（参考datasets.py L113）
+        # 2. Build custom dataset (ref datasets.py L113)
         class CustomCoordinateDataset:
             """
-            简单的自定义坐标数据集
-            只包含坐标信息，参考datasets.py的实现
+            Simple custom coordinate dataset.
+            Contains only coordinate info, ref datasets.py implementation.
             """
             def __init__(self, coordinates):
-                # 确保坐标是numpy数组且形状正确
+                # Ensure coords are numpy array with correct shape
                 if isinstance(coordinates, list):
                     coordinates = np.array(coordinates)
-                assert coordinates.shape[1] == 3, f"坐标必须是(N, 3)格式，当前: {coordinates.shape}"
+                assert coordinates.shape[1] == 3, f"Coords must be (N, 3) format, got: {coordinates.shape}"
                 
                 self.coordinates = coordinates.astype(np.float32)
                 
-                # 创建虚拟的raw_representations（全零，不会被使用但需要存在）
+                # Create dummy raw_representations (zeros, unused but required)
                 self.raw_representations = np.zeros((len(coordinates), 1), dtype=np.float32)
                 
-                # 如果target是embeddings，也需要虚拟的embeddings
+                # If target is embeddings, need dummy embeddings too
                 if pipeline_configs.target == "embeddings":
-                    # 根据INR输出维度创建虚拟embeddings
+                    # Create dummy embeddings from INR output dim
                     embd_dim = pipeline_configs.inr.dim_out
                     self.embeddings = np.zeros((len(coordinates), embd_dim), dtype=np.float32)
                 
-                print(f"创建自定义数据集，包含 {len(self.coordinates)} 个坐标点")
+                print(f"Created custom dataset with {len(self.coordinates)} coordinate points")
             
             def __len__(self):
                 return len(self.coordinates)
             
             def __getitem__(self, idx):
                 """
-                返回数据项，格式与原始数据集保持一致
+                Return data item, format consistent with original dataset.
                 """
                 item = {
                     "coordinates": self.coordinates[idx],
                     "raw_representations": self.raw_representations[idx]
                 }
                 
-                # 如果target是embeddings，添加embeddings字段
+                # If target is embeddings, add embeddings field
                 if pipeline_configs.target == "embeddings":
                     item["embeddings"] = self.embeddings[idx]
                 
                 return item
         
-        # 3. 创建自定义数据集和数据加载器
+        # 3. Create custom dataset and dataloader
         custom_dataset = CustomCoordinateDataset(custom_coords)
         custom_dataloader = DataLoader(
             custom_dataset, 
@@ -392,12 +392,12 @@ def train_inr(configs):
             drop_last=False
         )
         
-        print(f"创建自定义数据加载器，批大小: {batch_size}")
+        print(f"Created custom dataloader, batch_size: {batch_size}")
         
-        # 4. 使用trainer进行预测
-        print("[cyan]开始INR预测...[/cyan]")
+        # 4. Run prediction with trainer
+        print("[cyan]Starting INR prediction...[/cyan]")
         trainer.predict(fitting_system, custom_dataloader)
         
-        print(f"[green]自定义坐标预测完成！结果已保存到: {fitting_system.logger.log_dir}[/green]")
+        print(f"[green]Custom coordinate prediction done! Results saved to: {fitting_system.logger.log_dir}[/green]")
 
 

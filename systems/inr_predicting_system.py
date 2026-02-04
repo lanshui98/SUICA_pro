@@ -18,7 +18,7 @@ from systems.embedder_fitting_system import EmbedderFittingSystem
 from datasets import ST2D
 
 def _cpu_workers(default=8):
-    """让 DataLoader 的 workers 与 LSF 的 -n 对齐，避免过度并行。"""
+    """Align DataLoader workers with LSF -n to avoid over-parallelization."""
     import os
     try:
         n = int(os.environ.get("LSB_DJOB_NUMPROC", ""))
@@ -31,8 +31,8 @@ def _cpu_workers(default=8):
 
 def _resolve_path(p, anchors):
     """
-    相对→绝对。按 anchors 顺序尝试（例如 [-cwd, 代码目录]）。
-    即使不存在也返回一个“最佳猜测”，方便报错打印。
+    Resolve relative to absolute. Try anchors in order (e.g. [cwd, code dir]).
+    Returns best guess even if path does not exist, for error messages.
     """
     p = Path(str(p))
     if p.is_absolute():
@@ -45,8 +45,8 @@ def _resolve_path(p, anchors):
 
 def _fix_lightning_version(path_like):
     """
-    若包含 .../lightning_logs/version_X/... 且该路径不存在，
-    自动在同级 lightning_logs 下寻找最新的 version_* 并替换。
+    If path contains .../lightning_logs/version_X/... and it does not exist,
+    auto-find the latest version_* under the same lightning_logs and substitute.
     """
     p = Path(path_like); s = str(p)
     tag = "/lightning_logs/version_"
@@ -94,12 +94,12 @@ class INRFittingSystem(L.LightningModule):
                     final_activation=final_act
                 )
         elif network_configs.model == "FFN":
-            # 支持新的编码选项（可选参数，向后兼容）
+            # Support new encoding options (optional, backward compatible)
             encoding_type = getattr(network_configs, 'encoding_type', 'basic')
             mapping_size = getattr(network_configs, 'mapping_size', 256)
             encoding_scales = getattr(network_configs, 'encoding_scales', [1, 10, 100])
-            anisotropic_3d = getattr(network_configs, 'anisotropic_3d', False)  # 3D各向异性编码
-            z_scales = getattr(network_configs, 'z_scales', None)  # z方向频率
+            anisotropic_3d = getattr(network_configs, 'anisotropic_3d', False)  # 3D anisotropic encoding
+            z_scales = getattr(network_configs, 'z_scales', None)  # z-direction frequencies
             
             self.fitting_model = FourierFeatureNet(
                 dim_in=network_configs.dim_in,
@@ -112,7 +112,7 @@ class INRFittingSystem(L.LightningModule):
                 encoding_scales=encoding_scales,
                 anisotropic_3d=anisotropic_3d,
                 z_scales=z_scales,
-                network_configs=network_configs  # 传递完整的config以便访问参数
+                network_configs=network_configs  # Pass full config for parameter access
             )
         elif network_configs.model == "NGP":
             self.fitting_model = NGP(
@@ -284,7 +284,7 @@ class INRFittingSystem(L.LightningModule):
         
 
 def predict_inr(configs):
-    # 让 ${case} 等插值立即生效
+    # Resolve ${case} etc. immediately
     OmegaConf.resolve(configs)
 
     dataset_configs = configs.dataset
@@ -293,41 +293,41 @@ def predict_inr(configs):
     pl.seed_everything(pipeline_configs.optimization.seed, workers=True)
     torch.set_float32_matmul_precision("highest")
 
-    # ---------- 路径归一化（集群安全） ----------
-    repo_root = Path(__file__).resolve().parent  # 当前 systems 文件所在目录
-    anchors = [Path.cwd(), repo_root]            # 优先 -cwd，其次代码目录
+    # ---------- Path normalization (cluster-safe) ----------
+    repo_root = Path(__file__).resolve().parent  # directory containing this systems file
+    anchors = [Path.cwd(), repo_root]            # prefer cwd, then code directory
 
-    # dataset.data_file 可能指向 lightning 产物：做绝对化 + version_* 容错
+    # dataset.data_file may point to lightning output: absolutize + version_* fallback
     if hasattr(dataset_configs, "data_file"):
         df = _resolve_path(dataset_configs.data_file, anchors)
         df = _fix_lightning_version(df)
         dataset_configs.data_file = str(df)
 
-    # 日志目录绝对化
+    # Absolutize logs directory
     pipeline_configs.optimization.logs = str(_resolve_path(pipeline_configs.optimization.logs, anchors))
     Path(pipeline_configs.optimization.logs).mkdir(parents=True, exist_ok=True)
 
-    # decoder ckpt（可选）
+    # decoder ckpt (optional)
     decoder = None
     if getattr(pipeline_configs.inr, "decoder", None) and getattr(pipeline_configs.inr.decoder, "ckpt", None):
         dec_ckpt = _fix_lightning_version(_resolve_path(pipeline_configs.inr.decoder.ckpt, anchors))
         decoder = EmbedderFittingSystem.load_from_checkpoint(str(dec_ckpt)).fitting_model.decoder
         print(f"[decoder] loaded from: {dec_ckpt}")
     else:
-        # 确保有字段，避免后续 getattr 报错
+        # Ensure field exists to avoid getattr errors
         pipeline_configs.inr.decoder = getattr(pipeline_configs.inr, "decoder", {"recon_loss": False, "finetune": False})
 
-    # 预测 ckpt（必需）
+    # prediction ckpt (required)
     if not getattr(pipeline_configs, "prediction", None) or not getattr(pipeline_configs.prediction, "ckpt", None):
-        raise ValueError("pipeline.prediction.ckpt 是预测必需项")
+        raise ValueError("pipeline.prediction.ckpt is required for prediction")
     pred_ckpt = _fix_lightning_version(_resolve_path(pipeline_configs.prediction.ckpt, anchors))
 
-    # ---------- 维度推断（来自数据或自定义坐标） ----------
+    # ---------- Dimension inference (from data or custom coords) ----------
     dataset_class = getattr(importlib.import_module("datasets"), dataset_configs.type)
     dataset = dataset_class(**dataset_configs)
     assert pipeline_configs.target in ["embeddings", "raw_representations"]
 
-    # 输入维度：若 custom 则读自定义坐标；否则从 dataset 样本推断
+    # Input dim: if custom, load custom coords; else infer from dataset sample
     if hasattr(pipeline_configs, "custom_coords_file") and pipeline_configs.predict_mode == "custom":
         custom_coords = np.load(str(_resolve_path(pipeline_configs.custom_coords_file, anchors)))
         coord_dim = custom_coords.shape[1]
@@ -339,7 +339,7 @@ def predict_inr(configs):
         pipeline_configs.inr.dim_in = coord_dim
         print(f"Detected dataset coord dim: {coord_dim}D")
 
-    # 输出维度
+    # Output dimension
     if pipeline_configs.target == "embeddings":
         pipeline_configs.inr.dim_out = dataset.get_embd_dim()
     else:
@@ -348,8 +348,8 @@ def predict_inr(configs):
     print(f"Predicting ST [italic red]{pipeline_configs.target}[/italic red] with INR ...")
     print(f"dim_in={pipeline_configs.inr.dim_in}, dim_out={pipeline_configs.inr.dim_out}")
 
-    # ---------- 从 ckpt 加载 INR（注意参数名！） ----------
-    # 你的类 __init__(self, configs, val_pca, decoder=None)，因此用 configs=..., val_pca=None
+    # ---------- Load INR from ckpt (note parameter names!) ----------
+    # Class __init__(self, configs, val_pca, decoder=None), so use configs=..., val_pca=None
     fitting_system = INRFittingSystem.load_from_checkpoint(
         str(pred_ckpt),
         configs=pipeline_configs,
@@ -372,7 +372,7 @@ def predict_inr(configs):
     batch_size = pipeline_configs.optimization.batch_size
     nw = _cpu_workers(default=8)
 
-    # ---------- 预测模式 ----------
+    # ---------- Prediction mode ----------
     if pipeline_configs.predict_mode == "all":
         dl = DataLoader(dataset, shuffle=False, batch_size=batch_size, num_workers=nw, drop_last=False)
         trainer.predict(fitting_system, dl)
@@ -385,7 +385,7 @@ def predict_inr(configs):
 
     elif pipeline_configs.predict_mode == "custom":
         print("[cyan]Start custom coordinate prediction...[/cyan]")
-        coords = custom_coords.astype(np.float32)  # 上面已加载
+        coords = custom_coords.astype(np.float32)  # loaded above
         class _CustomDataset(torch.utils.data.Dataset):
             def __init__(self, c):
                 self.coordinates = c

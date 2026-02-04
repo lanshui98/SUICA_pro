@@ -15,9 +15,9 @@ class GaussianEncoding(nn.Module):
         self._mapping_size = mapping_size
         self._scale = scale
         
-        # 初始化 B 矩阵（固定编码矩阵）
+        # Initialize B matrix (fixed encoding matrix)
         B = torch.randn((num_input_channels, mapping_size)) * scale
-        # 固定编码矩阵（使用 register_buffer 以便设备管理）
+        # Fixed encoding matrix (use register_buffer for device management)
         self.register_buffer('B', B)
 
     def forward(self, x):
@@ -29,8 +29,8 @@ class GaussianEncoding(nn.Module):
 
 class MultiScaleGaussianEncoding(nn.Module):
     """
-    多尺度 Fourier 特征编码 - 使用多个频率范围，提升对不同区域的表达能力
-    特别适合处理裂缝等复杂区域
+    Multi-scale Fourier feature encoding - uses multiple frequency ranges for better expressiveness.
+    Particularly suitable for complex regions like cracks.
     """
     def __init__(self, num_input_channels, mapping_size=128, scales=[1, 10, 100]):
         super().__init__()
@@ -44,16 +44,16 @@ class MultiScaleGaussianEncoding(nn.Module):
         ])
 
     def forward(self, x):
-        # 对每个尺度进行编码并拼接
+        # Encode at each scale and concatenate
         encoded = [enc(x) for enc in self.encodings]
         return torch.cat(encoded, dim=1)
 
 
 class EnhancedGaussianEncoding(nn.Module):
     """
-    增强版 Fourier 特征编码
-    - 多尺度频率编码
-    - 支持各向异性编码（对z方向使用不同频率）
+    Enhanced Fourier feature encoding:
+    - Multi-scale frequency encoding
+    - Supports anisotropic encoding (different frequencies for z-direction)
     """
     def __init__(self, num_input_channels, mapping_size=128, scales=[1, 10, 100], 
                  anisotropic_3d=False, z_scales=None):
@@ -63,47 +63,47 @@ class EnhancedGaussianEncoding(nn.Module):
         self.scales = scales
         self.anisotropic_3d = anisotropic_3d and num_input_channels == 3
         
-        # 如果是3D且需要各向异性编码，为z方向使用不同的频率
+        # For 3D with anisotropic encoding, use different frequencies for z-direction
         if self.anisotropic_3d:
             if z_scales is None:
-                # 默认z方向使用更低的频率（因为z方向稀疏）
-                z_scales = [s * 0.1 for s in scales]  # z方向频率降低10倍
+                # Default: lower frequencies for z (sparse z-direction)
+                z_scales = [s * 0.1 for s in scales]  # z-direction frequency reduced 10x
             self.z_scales = z_scales
             
-            # xy方向编码（前2维）
+            # xy-direction encoding (first 2 dims)
             self.xy_encodings = nn.ModuleList([
                 GaussianEncoding(2, mapping_size, scale=s)
                 for s in scales
             ])
-            # z方向编码（第3维）
+            # z-direction encoding (3rd dim)
             self.z_encodings = nn.ModuleList([
                 GaussianEncoding(1, mapping_size, scale=s)
                 for s in z_scales
             ])
         else:
-            # 标准多尺度编码
+            # Standard multi-scale encoding
             self.encodings = nn.ModuleList([
                 GaussianEncoding(num_input_channels, mapping_size, scale=s)
                 for s in scales
             ])
 
     def forward(self, x):
-        # 各向异性编码（3D，z方向稀疏）
+        # Anisotropic encoding (3D, sparse z-direction)
         if self.anisotropic_3d:
-            # 分离xy和z坐标
+            # Separate xy and z coordinates
             xy = x[:, :2]  # [batch, 2]
             z = x[:, 2:3]  # [batch, 1]
             
-            # xy方向编码
+            # xy-direction encoding
             xy_encoded = [enc(xy) for enc in self.xy_encodings]
-            # z方向编码（使用不同频率）
+            # z-direction encoding (different frequencies)
             z_encoded = [enc(z) for enc in self.z_encodings]
             
-            # 拼接所有编码
+            # Concatenate all encodings
             encoded = xy_encoded + z_encoded
             result = torch.cat(encoded, dim=1)
         else:
-            # 标准多尺度编码
+            # Standard multi-scale encoding
             encoded = [enc(x) for enc in self.encodings]
             result = torch.cat(encoded, dim=1)
         
@@ -116,12 +116,12 @@ class FourierFeatureNet(nn.Module):
                  anisotropic_3d=False, z_scales=None, network_configs=None):
         super().__init__()
         
-        # 如果network_configs提供了，优先从中获取参数
+        # If network_configs provided, prefer parameters from it
         if network_configs is not None:
             anisotropic_3d = getattr(network_configs, 'anisotropic_3d', anisotropic_3d)
             z_scales = getattr(network_configs, 'z_scales', z_scales)
         
-        # 选择编码类型
+        # Select encoding type
         if encoding_type == 'basic':
             self.transform = GaussianEncoding(dim_in, mapping_size, scale=10)
             encoding_dim = mapping_size * 2
@@ -135,10 +135,10 @@ class FourierFeatureNet(nn.Module):
                 z_scales=z_scales
             )
             
-            # 计算编码维度
+            # Compute encoding dimension
             if anisotropic_3d and dim_in == 3:
-                # xy方向 + z方向的编码（每个都有mapping_size*2维）
-                encoding_dim = mapping_size * 2 * len(encoding_scales) * 2  # xy和z各一套
+                # xy-direction + z-direction encoding (each has mapping_size*2 dims)
+                encoding_dim = mapping_size * 2 * len(encoding_scales) * 2  # one set for xy, one for z
             else:
                 encoding_dim = mapping_size * 2 * len(encoding_scales)
         else:
@@ -163,21 +163,21 @@ class FourierFeatureNet(nn.Module):
 
 
 if __name__ == "__main__":
-    # 测试基本版本
+    # Test basic version
     transform_basic = FourierFeatureNet(dim_in=2, dim_hidden=8, dim_out=64, num_layers=2, 
                                        final_activation="Identity", encoding_type='basic')
     x = torch.ones([100, 2])
     y = transform_basic(x)
     print(f"Basic encoding output shape: {y.shape}")
     
-    # 测试多尺度版本
+    # Test multiscale version
     transform_multiscale = FourierFeatureNet(dim_in=2, dim_hidden=8, dim_out=64, num_layers=2,
                                             final_activation="Identity", encoding_type='multiscale',
                                             mapping_size=128, encoding_scales=[1, 10, 100])
     y = transform_multiscale(x)
     print(f"Multiscale encoding output shape: {y.shape}")
     
-    # 测试增强版本（推荐用于裂缝区域）
+    # Test enhanced version (recommended for crack regions)
     transform_enhanced = FourierFeatureNet(dim_in=2, dim_hidden=8, dim_out=64, num_layers=2,
                                           final_activation="Identity", encoding_type='enhanced',
                                           mapping_size=128, encoding_scales=[1, 10, 100])

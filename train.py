@@ -17,22 +17,22 @@ if __name__ == "__main__":
 
     conf_path = Path(args.conf).resolve()
     conf_dir  = conf_path.parent
-    repo_root = Path(__file__).resolve().parent  # train.py 所在目录
+    repo_root = Path(__file__).resolve().parent  # directory containing train.py
     cwd       = Path.cwd()
 
     def resolve_rel(pth: str) -> Path:
         p = Path(pth)
         if p.is_absolute():
             return p
-        # 依次尝试：提交时的工作目录(-cwd) → 仓库根(train.py所在目录) → 配置文件目录
+        # Try in order: cwd -> repo root -> config directory
         for base in (cwd, repo_root, conf_dir):
             cand = (base / p)
             if cand.exists():
                 return cand.resolve()
-        # 都不存在时，按“仓库根”拼出一个候选并报错时打印
+        # If none exist, use repo root for error message
         return (repo_root / p).resolve()
 
-    # 规范化路径
+    # Normalize paths
     configs.dataset.data_file = str(resolve_rel(str(configs.dataset.data_file)))
     configs.pipeline.optimization.logs = str(resolve_rel(str(configs.pipeline.optimization.logs)))
 
@@ -43,17 +43,17 @@ if __name__ == "__main__":
     p = configs.dataset.data_file
     if not os.path.exists(p):
         raise FileNotFoundError(
-            f"data_file 不存在: {p}\n"
-            f"建议检查 -cwd 或将 YAML 中 data_file 改为绝对路径。"
+            f"data_file not found: {p}\n"
+            f"Check -cwd or set data_file to absolute path in YAML."
         )
 
-    # 轻量预检：是否误传了 .h5ad.gz
+    # Quick check: ensure not gzipped .h5ad.gz
     with open(p, "rb") as f:
         if f.read(2) == b"\x1f\x8b":
-            raise RuntimeError(f"{p} 看起来是 gzip 压缩包（.h5ad.gz），请先 gunzip 解压为 .h5ad")
+            raise RuntimeError(f"{p} appears to be gzipped (.h5ad.gz). Please gunzip to .h5ad first.")
 
     if not h5py.is_hdf5(p):
-        raise RuntimeError(f"{p} 不是 HDF5（.h5ad）文件：请检查路径/文件是否损坏或为 zarr 目录")
+        raise RuntimeError(f"{p} is not a valid HDF5 (.h5ad) file. Check path/file or if it is a zarr directory.")
 
     if args.mode == "embedder":
         train_embedder(configs)
