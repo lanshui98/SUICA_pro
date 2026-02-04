@@ -62,7 +62,7 @@ python train.py --mode embedder --conf ./configs/ST/embedder_gae_3d_sparse.yaml
 **Train the GAE-INR**
 
 ```
-# 2D (requires GAE output: logs/GAE-2D/${case}/.../embedded-all.h5ad)
+# 2D
 python train.py --mode inr --conf ./configs/ST/inr_embd.yaml
 ```
 
