@@ -43,7 +43,7 @@ The typical data structure is as follows:
     |-- requirements.txt
 ```
 
-**Note:** Update `data_file` in the YAML config to point to your `.h5ad` file.
+**Note:** Update the YAML config to point to your `.h5ad` file.
 
 ## Training
 
