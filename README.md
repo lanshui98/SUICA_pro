@@ -50,7 +50,7 @@ The typical data structure is as follows:
 **Train the Graph AutoEncoder (GAE)**
 
 ```
-# 2D spatial data
+# 2D data
 python train.py --mode embedder --conf ./configs/ST/embedder_gae.yaml
 ```
 
