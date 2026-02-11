@@ -11,20 +11,15 @@ pipeline:
   target: embeddings
   
   prediction:
-    ckpt: 'logs/GAE+FFN-2D/${case}/lightning_logs/version_0/checkpoints/last.ckpt'
+    ckpt: 'logs/GAE+FFN/${case}/lightning_logs/version_0/checkpoints/last.ckpt'
 
   inr:
     model: FFN
     num_hidden_layers: 3
     num_hidden_features: 2048 
     phase: 1000 # number of epoches in the INR pretraining phase, after this phase the decoder will be trained.
-    
-    encoding_type: multiscale
-    mapping_size: 128
-    encoding_scales: [1, 10, 100]
-
     decoder:
-      ckpt: logs/GAE-2D/${case}/lightning_logs/version_0/checkpoints/last.ckpt
+      ckpt: logs/GAE/${case}/lightning_logs/version_0/checkpoints/last.ckpt
       recon_loss: True
       finetune: True
       
@@ -33,7 +28,7 @@ pipeline:
     epochs: 2000
     lr: 1e-4
     val_freq: 200
-    logs: logs/GAE+FFN-2D/${case}
+    logs: logs/GAE+FFN/${case}
     batch_size: 8192
   
   predict_mode: custom
