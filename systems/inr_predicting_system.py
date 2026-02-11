@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 import os
 import importlib
+
 from pathlib import Path
 from omegaconf import OmegaConf
 
@@ -18,7 +19,7 @@ from systems.embedder_fitting_system import EmbedderFittingSystem
 from datasets import ST2D
 
 def _cpu_workers(default=8):
-    """Align DataLoader workers with LSF -n to avoid over-parallelization."""
+    """Align DataLoader workers with LSF's -n to avoid over-parallelization."""
     import os
     try:
         n = int(os.environ.get("LSB_DJOB_NUMPROC", ""))
@@ -31,8 +32,8 @@ def _cpu_workers(default=8):
 
 def _resolve_path(p, anchors):
     """
-    Resolve relative to absolute. Try anchors in order (e.g. [cwd, code dir]).
-    Returns best guess even if path does not exist, for error messages.
+    Convert relative to absolute. Try in order of anchors (e.g., [-cwd, code directory]).
+    Returns a "best guess" even if it doesn't exist, for convenient error printing.
     """
     p = Path(str(p))
     if p.is_absolute():
@@ -45,8 +46,8 @@ def _resolve_path(p, anchors):
 
 def _fix_lightning_version(path_like):
     """
-    If path contains .../lightning_logs/version_X/... and it does not exist,
-    auto-find the latest version_* under the same lightning_logs and substitute.
+    If path contains .../lightning_logs/version_X/... and that path doesn't exist,
+    automatically find the latest version_* in the same-level lightning_logs and replace it.
     """
     p = Path(path_like); s = str(p)
     tag = "/lightning_logs/version_"
@@ -94,12 +95,12 @@ class INRFittingSystem(L.LightningModule):
                     final_activation=final_act
                 )
         elif network_configs.model == "FFN":
-            # Support new encoding options (optional, backward compatible)
+            # Support new encoding options (optional parameters, backward compatible)
             encoding_type = getattr(network_configs, 'encoding_type', 'basic')
             mapping_size = getattr(network_configs, 'mapping_size', 256)
             encoding_scales = getattr(network_configs, 'encoding_scales', [1, 10, 100])
             anisotropic_3d = getattr(network_configs, 'anisotropic_3d', False)  # 3D anisotropic encoding
-            z_scales = getattr(network_configs, 'z_scales', None)  # z-direction frequencies
+            z_scales = getattr(network_configs, 'z_scales', None)  # z-direction frequency
             
             self.fitting_model = FourierFeatureNet(
                 dim_in=network_configs.dim_in,
@@ -112,7 +113,7 @@ class INRFittingSystem(L.LightningModule):
                 encoding_scales=encoding_scales,
                 anisotropic_3d=anisotropic_3d,
                 z_scales=z_scales,
-                network_configs=network_configs  # Pass full config for parameter access
+                network_configs=network_configs  # Pass complete config to access parameters
             )
         elif network_configs.model == "NGP":
             self.fitting_model = NGP(
@@ -284,7 +285,7 @@ class INRFittingSystem(L.LightningModule):
         
 
 def predict_inr(configs):
-    # Resolve ${case} etc. immediately
+    # Make ${case} etc. interpolation take effect immediately
     OmegaConf.resolve(configs)
 
     dataset_configs = configs.dataset
@@ -294,16 +295,16 @@ def predict_inr(configs):
     torch.set_float32_matmul_precision("highest")
 
     # ---------- Path normalization (cluster-safe) ----------
-    repo_root = Path(__file__).resolve().parent  # directory containing this systems file
-    anchors = [Path.cwd(), repo_root]            # prefer cwd, then code directory
+    repo_root = Path(__file__).resolve().parent  # Directory where current systems file is located
+    anchors = [Path.cwd(), repo_root]            # Priority: -cwd, then code directory
 
-    # dataset.data_file may point to lightning output: absolutize + version_* fallback
+    # dataset.data_file may point to lightning artifacts: make absolute + version_* tolerance
     if hasattr(dataset_configs, "data_file"):
         df = _resolve_path(dataset_configs.data_file, anchors)
         df = _fix_lightning_version(df)
         dataset_configs.data_file = str(df)
 
-    # Absolutize logs directory
+    # Make log directory absolute
     pipeline_configs.optimization.logs = str(_resolve_path(pipeline_configs.optimization.logs, anchors))
     Path(pipeline_configs.optimization.logs).mkdir(parents=True, exist_ok=True)
 
@@ -311,10 +312,13 @@ def predict_inr(configs):
     decoder = None
     if getattr(pipeline_configs.inr, "decoder", None) and getattr(pipeline_configs.inr.decoder, "ckpt", None):
         dec_ckpt = _fix_lightning_version(_resolve_path(pipeline_configs.inr.decoder.ckpt, anchors))
-        decoder = EmbedderFittingSystem.load_from_checkpoint(str(dec_ckpt)).fitting_model.decoder
+        decoder = EmbedderFittingSystem.load_from_checkpoint(
+            str(dec_ckpt),
+            weights_only=False
+        ).fitting_model.decoder
         print(f"[decoder] loaded from: {dec_ckpt}")
     else:
-        # Ensure field exists to avoid getattr errors
+        # Ensure field exists to avoid getattr errors later
         pipeline_configs.inr.decoder = getattr(pipeline_configs.inr, "decoder", {"recon_loss": False, "finetune": False})
 
     # prediction ckpt (required)
@@ -322,12 +326,12 @@ def predict_inr(configs):
         raise ValueError("pipeline.prediction.ckpt is required for prediction")
     pred_ckpt = _fix_lightning_version(_resolve_path(pipeline_configs.prediction.ckpt, anchors))
 
-    # ---------- Dimension inference (from data or custom coords) ----------
+    # ---------- Dimension inference (from data or custom coordinates) ----------
     dataset_class = getattr(importlib.import_module("datasets"), dataset_configs.type)
     dataset = dataset_class(**dataset_configs)
     assert pipeline_configs.target in ["embeddings", "raw_representations"]
 
-    # Input dim: if custom, load custom coords; else infer from dataset sample
+    # Input dimension: if custom then read custom coordinates; otherwise infer from dataset sample
     if hasattr(pipeline_configs, "custom_coords_file") and pipeline_configs.predict_mode == "custom":
         custom_coords = np.load(str(_resolve_path(pipeline_configs.custom_coords_file, anchors)))
         coord_dim = custom_coords.shape[1]
@@ -349,12 +353,13 @@ def predict_inr(configs):
     print(f"dim_in={pipeline_configs.inr.dim_in}, dim_out={pipeline_configs.inr.dim_out}")
 
     # ---------- Load INR from ckpt (note parameter names!) ----------
-    # Class __init__(self, configs, val_pca, decoder=None), so use configs=..., val_pca=None
+    # Your class __init__(self, configs, val_pca, decoder=None), so use configs=..., val_pca=None
     fitting_system = INRFittingSystem.load_from_checkpoint(
         str(pred_ckpt),
         configs=pipeline_configs,
         val_pca=None,
         decoder=decoder,
+        weights_only=False
     )
     fitting_system.pipeline_configs = pipeline_configs
     fitting_system.eval()
@@ -385,7 +390,7 @@ def predict_inr(configs):
 
     elif pipeline_configs.predict_mode == "custom":
         print("[cyan]Start custom coordinate prediction...[/cyan]")
-        coords = custom_coords.astype(np.float32)  # loaded above
+        coords = custom_coords.astype(np.float32)  # Already loaded above
         class _CustomDataset(torch.utils.data.Dataset):
             def __init__(self, c):
                 self.coordinates = c

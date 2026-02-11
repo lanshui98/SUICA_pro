@@ -36,12 +36,12 @@ class INRFittingSystem(L.LightningModule):
                     final_activation=final_act
                 )
         elif network_configs.model == "FFN":
-            # Support new encoding options (optional, backward compatible)
+            # Support new encoding options (optional parameters, backward compatible)
             encoding_type = getattr(network_configs, 'encoding_type', 'basic')
             mapping_size = getattr(network_configs, 'mapping_size', 256)
             encoding_scales = getattr(network_configs, 'encoding_scales', [1, 10, 100])
             anisotropic_3d = getattr(network_configs, 'anisotropic_3d', False)  # 3D anisotropic encoding
-            z_scales = getattr(network_configs, 'z_scales', None)  # z-direction frequencies
+            z_scales = getattr(network_configs, 'z_scales', None)  # z-direction frequency
             
             self.fitting_model = FourierFeatureNet(
                 dim_in=network_configs.dim_in,
@@ -54,7 +54,7 @@ class INRFittingSystem(L.LightningModule):
                 encoding_scales=encoding_scales,
                 anisotropic_3d=anisotropic_3d,
                 z_scales=z_scales,
-                network_configs=network_configs  # Pass full config for parameter access
+                network_configs=network_configs  # Pass complete config to access parameters
             )
         elif network_configs.model == "NGP":
             self.fitting_model = NGP(
@@ -272,7 +272,10 @@ def train_inr(configs):
 
     # pipeline configuration
     if pipeline_configs.inr.decoder:
-        decoder = EmbedderFittingSystem.load_from_checkpoint(pipeline_configs.inr.decoder.ckpt).fitting_model.decoder
+        decoder = EmbedderFittingSystem.load_from_checkpoint(
+            pipeline_configs.inr.decoder.ckpt,
+            weights_only=False
+        ).fitting_model.decoder
         print("[yellow]with pretrained decoder[/yellow]")
     else:
         decoder = None
@@ -321,17 +324,17 @@ def train_inr(configs):
 
         # 1. Get custom coordinates
         if hasattr(pipeline_configs, 'custom_coords_file'):
-            # Load coords from .npy file
+            # Load coordinates from .npy file
             custom_coords = np.load(pipeline_configs.custom_coords_file)
-            print(f"Loaded custom coords from file: {pipeline_configs.custom_coords_file}")
-            print(f"Coord shape: {custom_coords.shape}")
+            print(f"Loaded custom coordinates from file: {pipeline_configs.custom_coords_file}")
+            print(f"Coordinate shape: {custom_coords.shape}")
         elif hasattr(pipeline_configs, 'custom_coordinates'):
-            # Get coords directly from config
+            # Get coordinates directly from config
             custom_coords = np.array(pipeline_configs.custom_coordinates)
-            print(f"Loaded custom coords from config, shape: {custom_coords.shape}")
+            print(f"Loaded custom coordinates from config, shape: {custom_coords.shape}")
         else:
             # Default example coordinates
-            print("[yellow]No custom coords specified, using default example[/yellow]")
+            print("[yellow]No custom coordinates specified, using default example[/yellow]")
             custom_coords = np.array([
                 [10.0, 20.0, 0.0],
                 [30.0, 40.0, 0.0], 
@@ -339,26 +342,26 @@ def train_inr(configs):
                 [70.0, 80.0, 1.5]
             ])
         
-        # 2. Build custom dataset (ref datasets.py L113)
+        # 2. Build custom dataset (refer to datasets.py L113)
         class CustomCoordinateDataset:
             """
-            Simple custom coordinate dataset.
-            Contains only coordinate info, ref datasets.py implementation.
+            Simple custom coordinate dataset
+            Only contains coordinate information, refer to datasets.py implementation
             """
             def __init__(self, coordinates):
-                # Ensure coords are numpy array with correct shape
+                # Ensure coordinates are numpy array with correct shape
                 if isinstance(coordinates, list):
                     coordinates = np.array(coordinates)
-                assert coordinates.shape[1] == 3, f"Coords must be (N, 3) format, got: {coordinates.shape}"
+                assert coordinates.shape[1] == 3, f"Coordinates must be in (N, 3) format, current: {coordinates.shape}"
                 
                 self.coordinates = coordinates.astype(np.float32)
                 
-                # Create dummy raw_representations (zeros, unused but required)
+                # Create dummy raw_representations (all zeros, won't be used but need to exist)
                 self.raw_representations = np.zeros((len(coordinates), 1), dtype=np.float32)
                 
-                # If target is embeddings, need dummy embeddings too
+                # If target is embeddings, also need dummy embeddings
                 if pipeline_configs.target == "embeddings":
-                    # Create dummy embeddings from INR output dim
+                    # Create dummy embeddings based on INR output dimension
                     embd_dim = pipeline_configs.inr.dim_out
                     self.embeddings = np.zeros((len(coordinates), embd_dim), dtype=np.float32)
                 
@@ -369,7 +372,7 @@ def train_inr(configs):
             
             def __getitem__(self, idx):
                 """
-                Return data item, format consistent with original dataset.
+                Return data item, format consistent with original dataset
                 """
                 item = {
                     "coordinates": self.coordinates[idx],
@@ -382,7 +385,7 @@ def train_inr(configs):
                 
                 return item
         
-        # 3. Create custom dataset and dataloader
+        # 3. Create custom dataset and data loader
         custom_dataset = CustomCoordinateDataset(custom_coords)
         custom_dataloader = DataLoader(
             custom_dataset, 
@@ -392,12 +395,12 @@ def train_inr(configs):
             drop_last=False
         )
         
-        print(f"Created custom dataloader, batch_size: {batch_size}")
+        print(f"Created custom data loader, batch size: {batch_size}")
         
-        # 4. Run prediction with trainer
+        # 4. Use trainer for prediction
         print("[cyan]Starting INR prediction...[/cyan]")
         trainer.predict(fitting_system, custom_dataloader)
         
-        print(f"[green]Custom coordinate prediction done! Results saved to: {fitting_system.logger.log_dir}[/green]")
+        print(f"[green]Custom coordinate prediction completed! Results saved to: {fitting_system.logger.log_dir}[/green]")
 
 
