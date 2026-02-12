@@ -10,6 +10,20 @@ import numpy as np
 import os
 import importlib
 
+# PyTorch 2.6+ compatibility: Add omegaconf classes to safe globals for weights_only=True mode
+# This is needed because Lightning may internally use weights_only=True even when we pass weights_only=False
+try:
+    from omegaconf import DictConfig
+    from omegaconf.dictconfig import DictConfig as DictConfigLower
+    from omegaconf.base import ContainerMetadata
+    torch.serialization.add_safe_globals([
+        DictConfig,
+        DictConfigLower,
+        ContainerMetadata,
+    ])
+except ImportError:
+    pass  # omegaconf not available, skip
+
 from networks import SirenNet, FourierFeatureNet, NGP
 from utils import metrics, plot_ST
 from systems.embedder_fitting_system import EmbedderFittingSystem
