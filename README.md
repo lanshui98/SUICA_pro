@@ -100,4 +100,4 @@ python map_coords_back.py --reconstructed reconstructed-custom-3d.h5ad --referen
 ```
 
 ### Acknowledgements
-This project is built upon and inspired by [SUICA]('https://github.com/Szym29/SUICA').
+This project is built upon and inspired by [SUICA](https://github.com/Szym29/SUICA).
