@@ -100,4 +100,10 @@ python map_coords_back.py --reconstructed reconstructed-custom-3d.h5ad --referen
 ```
 
 ### Acknowledgements
-This project is built upon and inspired by [SUICA](https://github.com/Szym29/SUICA).
+If you find this useful, please cite our work:
+
+Shui, L., Liu, Y., Julio, I.C., Clemenceau, J.R., Hoi, X.P., Dai, Y., Lu, W., Min, J., Khan, K., Roemer, B. and Jiang, M., 2026. UniST: A Unified Computational Framework for 3D Spatial Transcriptomics Reconstruction. bioRxiv, pp.2026-03.
+
+This project is inspired by [SUICA](https://github.com/Szym29/SUICA). Please also consider citing SUICA:
+
+Zhu, Q., Zheng, Y., Sang, Y., Zhan, Y., Zhu, Z., Ding, J. and Zheng, Y., 2024. Suica: Learning super-high dimensional sparse implicit neural representations for spatial transcriptomics. arXiv preprint arXiv:2412.01124.
